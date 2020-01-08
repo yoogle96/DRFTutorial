@@ -2,11 +2,17 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework import generics, permissions
 from snippets.models import Snippet
-from snippets.serializers import SnippetSerializer
+from snippets.permissions import IsOwnerOrReadOnly
+from snippets.serializers import SnippetSerializer, UserSerializer
 from django.http import Http404
+from django.contrib.auth.models import User
+
 
 class SnippetList(APIView):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
     def get(self, request, format=None):
         snippets = Snippet.objects.all()
         serializer = SnippetSerializer(snippets, many=True)
@@ -15,11 +21,14 @@ class SnippetList(APIView):
     def post(self, request, format=None):
         serializer = SnippetSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(owner=self.request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class SnippetDetail(APIView):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly,
+                      IsOwnerOrReadOnly]
+
     def get_object(self, pk):
         try:
             return Snippet.objects.get(pk=pk)
@@ -45,15 +54,14 @@ class SnippetDetail(APIView):
         snippet.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+class UserList(generics.ListAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
 
 
-
-
-
-
-
-
-
+class UserDetail(generics.RetrieveAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
 
 
 
